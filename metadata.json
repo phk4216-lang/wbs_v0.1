@@ -1,0 +1,5 @@
+{
+  "name": "Project WBS & Timeline Manager",
+  "description": "Manage projects with WBS, monthly timelines, and detailed project tracking (PO, PD, Devs, Priority).",
+  "requestFramePermissions": []
+}

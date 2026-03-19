@@ -1,0 +1,61 @@
+{
+  "entities": {
+    "Project": {
+      "title": "Project",
+      "description": "Main project information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "po": { "type": "string" },
+        "pd": { "type": "string" },
+        "beDev": { "type": "string" },
+        "feDev": { "type": "string" },
+        "status": { "type": "string", "enum": ["대기", "진행중", "완료"] },
+        "planningStart": { "type": "string", "format": "date-time" },
+        "planningEnd": { "type": "string", "format": "date-time" },
+        "designStart": { "type": "string", "format": "date-time" },
+        "designEnd": { "type": "string", "format": "date-time" },
+        "devStart": { "type": "string", "format": "date-time" },
+        "devEnd": { "type": "string", "format": "date-time" },
+        "qaStart": { "type": "string", "format": "date-time" },
+        "qaEnd": { "type": "string", "format": "date-time" },
+        "deployStart": { "type": "string", "format": "date-time" },
+        "deployEnd": { "type": "string", "format": "date-time" },
+        "category": { "type": "string", "enum": ["주요과제", "서스테이닝"] },
+        "order": { "type": "number", "minimum": 1, "maximum": 10 },
+        "notionLink": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "status", "ownerId"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "WBS Task for a project",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "projectId": { "type": "string" },
+        "title": { "type": "string" },
+        "assignee": { "type": "string" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["Todo", "In Progress", "Done"] },
+        "progress": { "type": "number" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["projectId", "title", "startDate", "endDate", "ownerId"]
+    }
+  },
+  "firestore": {
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Collection of projects"
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Collection of WBS tasks"
+    }
+  }
+}

@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.ownerId;
+    }
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.email == "olive@rxc.co.kr";
+    }
+    function isValidProject(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.status in ["대기", "진행중", "완료"] &&
+             data.category in ["주요과제", "서스테이닝"] &&
+             data.order is number && data.order >= 1 && data.order <= 10 &&
+             data.ownerId == request.auth.uid &&
+             (!('startDate' in data) || data.startDate is string || data.startDate == null) &&
+             (!('endDate' in data) || data.endDate is string || data.endDate == null) &&
+             (!('planningStart' in data) || data.planningStart is string) &&
+             (!('planningEnd' in data) || data.planningEnd is string) &&
+             (!('designStart' in data) || data.designStart is string) &&
+             (!('designEnd' in data) || data.designEnd is string) &&
+             (!('devStart' in data) || data.devStart is string) &&
+             (!('devEnd' in data) || data.devEnd is string) &&
+             (!('qaStart' in data) || data.qaStart is string) &&
+             (!('qaEnd' in data) || data.qaEnd is string) &&
+             (!('deployStart' in data) || data.deployStart is string) &&
+             (!('deployEnd' in data) || data.deployEnd is string);
+    }
+    function isValidTask(data) {
+      return data.projectId is string && data.title is string && data.title.size() > 0 &&
+             data.ownerId == request.auth.uid;
+    }
+
+    match /projects/{projectId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidProject(request.resource.data);
+      allow update: if isAdmin() && isValidProject(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidTask(request.resource.data);
+      allow update: if isAdmin() && isValidTask(request.resource.data);
+      allow delete: if isAdmin();
+    }
+  }
+}
