@@ -41,7 +41,7 @@ import { twMerge } from 'tailwind-merge';
 import { 
   db, 
   auth, 
-  signInAnon, 
+  signIn, 
   logOut, 
   OperationType, 
   handleFirestoreError 
@@ -201,8 +201,6 @@ export default function App() {
   const [selectedAssignee, setSelectedAssignee] = useState<string>('');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isSummaryView, setIsSummaryView] = useState(false);
-  const [password, setPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
   const timelineScrollRef = useRef<HTMLDivElement>(null);
 
   // Auth Listener
@@ -213,20 +211,6 @@ export default function App() {
     });
     return unsubscribe;
   }, []);
-
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === 'RXC2026!') {
-      try {
-        await signInAnon();
-      } catch (err) {
-        setPasswordError('Authentication failed. Please try again.');
-        console.error(err);
-      }
-    } else {
-      setPasswordError('Invalid password. Please try again.');
-    }
-  };
 
   // Data Listeners
   useEffect(() => {
@@ -484,28 +468,13 @@ export default function App() {
           </div>
           <h1 className="text-3xl font-bold text-slate-900 mb-3">Project Hub</h1>
           <p className="text-slate-500 mb-10">Manage your WBS and product timelines with ease.</p>
-          
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
-            <div className="text-left">
-              <label className="block text-sm font-medium text-slate-700 mb-1 ml-1">Password</label>
-              <input 
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                autoFocus
-              />
-              {passwordError && <p className="text-red-500 text-xs mt-2 ml-1">{passwordError}</p>}
-            </div>
-            <button 
-              type="submit"
-              className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-semibold hover:bg-indigo-700 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-indigo-100 flex items-center justify-center gap-3"
-            >
-              Enter System
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </form>
+          <button 
+            onClick={signIn}
+            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-semibold hover:bg-indigo-700 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-indigo-100 flex items-center justify-center gap-3"
+          >
+            <User className="w-5 h-5" />
+            Sign in with Google
+          </button>
         </motion.div>
       </div>
     );
@@ -527,12 +496,8 @@ export default function App() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
                 <div className="text-right hidden sm:block">
-                  <p className="text-sm font-semibold text-slate-900">
-                    {user.isAnonymous ? 'Shared Session' : user.displayName}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {user.isAnonymous ? 'Authorized Access' : user.email}
-                  </p>
+                  <p className="text-sm font-semibold text-slate-900">{user.displayName}</p>
+                  <p className="text-xs text-slate-500">{user.email}</p>
                 </div>
                 <button 
                   onClick={logOut}
