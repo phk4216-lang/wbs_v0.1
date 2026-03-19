@@ -187,6 +187,28 @@ const OrderBadge = ({ order }: { order: number }) => (
 
 // --- Main App ---
 
+const HOLIDAYS_2026 = [
+  '2026-01-01', // 신정
+  '2026-02-16', '2026-02-17', '2026-02-18', // 설날
+  '2026-03-01', // 삼일절
+  '2026-03-02', // 삼일절 대체공휴일
+  '2026-05-05', // 어린이날
+  '2026-05-24', // 부처님 오신 날
+  '2026-05-25', // 부처님 오신 날 대체공휴일
+  '2026-06-06', // 현충일
+  '2026-08-15', // 광복절
+  '2026-09-24', '2026-09-25', '2026-09-26', // 추석
+  '2026-10-03', // 개천절
+  '2026-10-05', // 개천절 대체공휴일
+  '2026-10-09', // 한글날
+  '2026-12-25', // 크리스마스
+];
+
+const isHoliday = (date: Date) => {
+  const dateStr = format(date, 'yyyy-MM-dd');
+  return HOLIDAYS_2026.includes(dateStr);
+};
+
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -624,7 +646,7 @@ export default function App() {
                                           key={day.toString()} 
                                           className={cn(
                                             "w-8 shrink-0 text-center py-2 text-[9px] font-bold border-r border-slate-100 last:border-r-0",
-                                            [0, 6].includes(day.getDay()) ? "bg-slate-100/50 text-slate-400" : "text-slate-500",
+                                            ([0, 6].includes(day.getDay()) || isHoliday(day)) ? "bg-slate-100/50 text-red-400" : "text-slate-500",
                                             isToday(day) && "bg-indigo-50 text-indigo-600 ring-1 ring-inset ring-indigo-200"
                                           )}
                                         >
@@ -659,7 +681,7 @@ export default function App() {
                           return (
                             <div 
                               key={project.id} 
-                              className="flex group hover:bg-slate-50/30 transition-colors cursor-pointer"
+                              className="flex group hover:bg-slate-50/30 transition-colors cursor-pointer relative hover:z-30"
                               onClick={() => {
                                 setSelectedProjectId(project.id);
                               }}
@@ -750,7 +772,7 @@ export default function App() {
                                                 key={day.toString()} 
                                                 className={cn(
                                                   "w-8 shrink-0 border-r border-slate-50/50 last:border-r-0 relative",
-                                                  [0, 6].includes(day.getDay()) ? "bg-slate-50/30" : "",
+                                                  ([0, 6].includes(day.getDay()) || isHoliday(day)) ? "bg-slate-50/30" : "",
                                                   isDayToday && "bg-indigo-50/20"
                                                 )}
                                               >
@@ -821,7 +843,7 @@ export default function App() {
                                         }}
                                       >
                                         {/* Tooltip */}
-                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-slate-900 text-white text-[10px] rounded opacity-0 group-hover/phase:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-xl">
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 px-2 py-1 bg-slate-900/95 text-white text-[10px] rounded opacity-0 group-hover/phase:opacity-100 pointer-events-none whitespace-nowrap z-[100] shadow-2xl backdrop-blur-sm ring-1 ring-white/10">
                                           {phase.label} ({isSameDay(pStart, pEnd) ? format(pStart, 'yyyy.MM.dd') : `${format(pStart, 'yyyy.MM.dd')}~${format(pEnd, 'yyyy.MM.dd')}`})
                                         </div>
                                       </div>
