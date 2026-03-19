@@ -341,19 +341,22 @@ export default function App() {
     const planningEnd = formData.get('planningEnd') as string;
     const designStart = formData.get('designStart') as string;
     const designEnd = formData.get('designEnd') as string;
-    const devStart = formData.get('devStart') as string;
-    const devEnd = formData.get('devEnd') as string;
+    const frontendStart = formData.get('frontendStart') as string;
+    const frontendEnd = formData.get('frontendEnd') as string;
+    const backendStart = formData.get('backendStart') as string;
+    const backendEnd = formData.get('backendEnd') as string;
     const qaStart = formData.get('qaStart') as string;
     const qaEnd = formData.get('qaEnd') as string;
-    const deployStart = formData.get('deployStart') as string;
     const deployEnd = formData.get('deployEnd') as string;
+    const deployStart = deployEnd; // Use same date for start and end for single date deployment
 
     const dates = [
       planningStart, planningEnd,
       designStart, designEnd,
-      devStart, devEnd,
+      frontendStart, frontendEnd,
+      backendStart, backendEnd,
       qaStart, qaEnd,
-      deployStart, deployEnd
+      deployEnd
     ].filter(Boolean).sort();
 
     const data = {
@@ -371,8 +374,10 @@ export default function App() {
       planningEnd,
       designStart,
       designEnd,
-      devStart,
-      devEnd,
+      frontendStart,
+      frontendEnd,
+      backendStart,
+      backendEnd,
       qaStart,
       qaEnd,
       deployStart,
@@ -666,25 +671,33 @@ export default function App() {
                                     <CategoryBadge category={project.category} />
                                     <OrderBadge order={project.order} />
                                   </div>
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteProject(project.id);
-                                    }}
-                                    className="p-1 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded transition-all opacity-0 group-hover:opacity-100"
-                                    title="Delete Project"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
+                                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setModalType('project');
+                                        setEditingItem(project);
+                                        setIsModalOpen(true);
+                                      }}
+                                      className="p-1 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-all"
+                                      title="Edit Project"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteProject(project.id);
+                                      }}
+                                      className="p-1 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded transition-all"
+                                      title="Delete Project"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
                                 <span 
                                   className="font-bold text-slate-700 truncate text-sm hover:text-indigo-600 cursor-pointer transition-colors"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setModalType('project');
-                                    setEditingItem(project);
-                                    setIsModalOpen(true);
-                                  }}
                                 >
                                   {project.name}
                                 </span>
@@ -697,9 +710,13 @@ export default function App() {
                                   <span>
                                     {start ? format(start, 'yyyy.MM.dd') : '-'} ~ {end ? format(end, 'yyyy.MM.dd') : '미정'}
                                   </span>
-                                  {project.deployEnd && (
+                                  {project.deployEnd ? (
                                     <span className="text-indigo-500 font-bold">
                                       (배포일 : {format(parseISO(project.deployEnd), 'MM.dd')})
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 font-medium">
+                                      (일정 검토중)
                                     </span>
                                   )}
                                 </div>
@@ -752,7 +769,8 @@ export default function App() {
                                   {[
                                     { label: '기획', start: project.planningStart, end: project.planningEnd, color: 'bg-blue-500' },
                                     { label: '디자인', start: project.designStart, end: project.designEnd, color: 'bg-purple-500' },
-                                    { label: '개발', start: project.devStart, end: project.devEnd, color: 'bg-amber-500' },
+                                    { label: '백엔드', start: project.backendStart, end: project.backendEnd, color: 'bg-amber-500' },
+                                    { label: '프론트', start: project.frontendStart, end: project.frontendEnd, color: 'bg-indigo-500' },
                                     { label: 'QA', start: project.qaStart, end: project.qaEnd, color: 'bg-pink-500' },
                                     { label: '배포', start: project.deployStart, end: project.deployEnd, color: 'bg-emerald-500' },
                                   ].map((phase, idx) => {
@@ -804,7 +822,7 @@ export default function App() {
                                       >
                                         {/* Tooltip */}
                                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-slate-900 text-white text-[10px] rounded opacity-0 group-hover/phase:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-xl">
-                                          {phase.label} ({format(pStart, 'yyyy.MM.dd')}~{format(pEnd, 'yyyy.MM.dd')})
+                                          {phase.label} ({isSameDay(pStart, pEnd) ? format(pStart, 'yyyy.MM.dd') : `${format(pStart, 'yyyy.MM.dd')}~${format(pEnd, 'yyyy.MM.dd')}`})
                                         </div>
                                       </div>
                                     );
@@ -892,7 +910,7 @@ export default function App() {
                     <div>
                       <h2 className="text-2xl font-bold text-slate-900 leading-tight">{selectedProject.name}</h2>
                       <div className="flex items-center gap-3 mt-1">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Order: {selectedProject.order}</span>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">우선순위: {selectedProject.order}</span>
                         <StatusBadge status={selectedProject.status} />
                         <CategoryBadge category={selectedProject.category} />
                       </div>
@@ -956,6 +974,7 @@ export default function App() {
                             </p>
                             <p className="text-xs font-bold opacity-70 mt-1 uppercase tracking-wider">
                               {selectedProject.startDate && selectedProject.endDate ? differenceInDays(parseISO(selectedProject.endDate), parseISO(selectedProject.startDate)) : 0} Days Duration
+                              {!selectedProject.deployEnd && <span className="ml-2 text-white/80">(일정 검토중)</span>}
                             </p>
                           </div>
                         </div>
@@ -993,14 +1012,19 @@ export default function App() {
                           {[
                             { label: '기획 (Planning)', start: selectedProject.planningStart, end: selectedProject.planningEnd, color: 'text-blue-600', bg: 'bg-blue-50' },
                             { label: '디자인 (Design)', start: selectedProject.designStart, end: selectedProject.designEnd, color: 'text-purple-600', bg: 'bg-purple-50' },
-                            { label: '개발 (Development)', start: selectedProject.devStart, end: selectedProject.devEnd, color: 'text-amber-600', bg: 'bg-amber-50' },
+                            { label: '백엔드 개발 (Backend)', start: selectedProject.backendStart, end: selectedProject.backendEnd, color: 'text-amber-600', bg: 'bg-amber-50' },
+                            { label: '프론트 개발 (Frontend)', start: selectedProject.frontendStart, end: selectedProject.frontendEnd, color: 'text-indigo-600', bg: 'bg-indigo-50' },
                             { label: 'QA', start: selectedProject.qaStart, end: selectedProject.qaEnd, color: 'text-pink-600', bg: 'bg-pink-50' },
-                            { label: '배포 (Deployment)', start: selectedProject.deployStart, end: selectedProject.deployEnd, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                            { label: '배포 (Deployment)', date: selectedProject.deployEnd, color: 'text-emerald-600', bg: 'bg-emerald-50' },
                           ].map(phase => (
                             <div key={phase.label} className="flex flex-col gap-1 p-4 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-indigo-200 transition-all">
                               <span className={cn("text-[10px] font-black uppercase tracking-widest", phase.color)}>{phase.label}</span>
                               <span className="text-sm text-slate-800 font-bold">
-                                {phase.start ? format(parseISO(phase.start), 'yyyy.MM.dd') : '-'} ~ {phase.end ? format(parseISO(phase.end), 'yyyy.MM.dd') : '-'}
+                                {'date' in phase ? (
+                                  phase.date ? format(parseISO(phase.date), 'yyyy.MM.dd') : '-'
+                                ) : (
+                                  `${phase.start ? format(parseISO(phase.start), 'yyyy.MM.dd') : '-'} ~ ${phase.end ? format(parseISO(phase.end), 'yyyy.MM.dd') : '-'}`
+                                )}
                               </span>
                             </div>
                           ))}
@@ -1062,7 +1086,7 @@ export default function App() {
                           <input name="po" required defaultValue={editingItem?.po} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" />
                         </div>
                         <div>
-                          <label className="block text-sm font-bold text-slate-700 mb-2">PD (Optional)</label>
+                          <label className="block text-sm font-bold text-slate-700 mb-2">PD</label>
                           <input name="pd" defaultValue={editingItem?.pd} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" />
                         </div>
                         <div>
@@ -1089,7 +1113,7 @@ export default function App() {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-sm font-bold text-slate-700 mb-2">Order (1-10)</label>
+                          <label className="block text-sm font-bold text-slate-700 mb-2">우선순위 (1-10)</label>
                           <select name="order" defaultValue={editingItem?.order || 1} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all">
                             {[1,2,3,4,5,6,7,8,9,10].map(n => (
                               <option key={n} value={n}>{n}</option>
@@ -1120,16 +1144,21 @@ export default function App() {
                             {[
                               { label: '기획/검토 (Planning)', start: 'planningStart', end: 'planningEnd', color: 'blue', bg: 'bg-blue-50/30', border: 'border-blue-100', text: 'text-blue-600' },
                               { label: '디자인 (Design)', start: 'designStart', end: 'designEnd', color: 'purple', bg: 'bg-purple-50/30', border: 'border-purple-100', text: 'text-purple-600' },
-                              { label: '개발 (Development)', start: 'devStart', end: 'devEnd', color: 'amber', bg: 'bg-amber-50/30', border: 'border-amber-100', text: 'text-amber-600' },
+                              { label: '백엔드 개발 (Backend)', start: 'backendStart', end: 'backendEnd', color: 'amber', bg: 'bg-amber-50/30', border: 'border-amber-100', text: 'text-amber-600' },
+                              { label: '프론트 개발 (Frontend)', start: 'frontendStart', end: 'frontendEnd', color: 'indigo', bg: 'bg-indigo-50/30', border: 'border-indigo-100', text: 'text-indigo-600' },
                               { label: 'QA', start: 'qaStart', end: 'qaEnd', color: 'pink', bg: 'bg-pink-50/30', border: 'border-pink-100', text: 'text-pink-600' },
-                              { label: '배포 (Deployment)', start: 'deployStart', end: 'deployEnd', color: 'emerald', bg: 'bg-emerald-50/30', border: 'border-emerald-100', text: 'text-emerald-600' },
+                              { label: '배포 (Deployment)', date: 'deployEnd', color: 'emerald', bg: 'bg-emerald-50/30', border: 'border-emerald-100', text: 'text-emerald-600' },
                             ].map(phase => (
-                              <div key={phase.start} className={cn("p-4 rounded-2xl border", phase.bg, phase.border)}>
+                              <div key={'date' in phase ? phase.date : phase.start} className={cn("p-4 rounded-2xl border", phase.bg, phase.border)}>
                                 <label className={cn("block text-xs font-bold uppercase tracking-wider mb-2", phase.text)}>{phase.label}</label>
-                                <div className="grid grid-cols-2 gap-4">
-                                  <input name={phase.start} type="date" defaultValue={editingItem?.[phase.start as keyof Project] as string} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" />
-                                  <input name={phase.end} type="date" defaultValue={editingItem?.[phase.end as keyof Project] as string} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" />
-                                </div>
+                                {'date' in phase ? (
+                                  <input name={phase.date} type="date" defaultValue={editingItem?.[phase.date as keyof Project] as string} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+                                ) : (
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <input name={phase.start} type="date" defaultValue={editingItem?.[phase.start as keyof Project] as string} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+                                    <input name={phase.end} type="date" defaultValue={editingItem?.[phase.end as keyof Project] as string} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
