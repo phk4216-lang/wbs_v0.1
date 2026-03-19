@@ -11,9 +11,6 @@ service cloud.firestore {
     function isDocOwner() {
       return isAuthenticated() && request.auth.uid == resource.data.ownerId;
     }
-    function isAdmin() {
-      return isAuthenticated() && request.auth.token.email == "olive@rxc.co.kr";
-    }
     function isValidProject(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              data.status in ["대기", "진행중", "완료"] &&
@@ -39,17 +36,11 @@ service cloud.firestore {
     }
 
     match /projects/{projectId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin() && isValidProject(request.resource.data);
-      allow update: if isAdmin() && isValidProject(request.resource.data);
-      allow delete: if isAdmin();
+      allow read, write: if isAuthenticated();
     }
 
     match /tasks/{taskId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin() && isValidTask(request.resource.data);
-      allow update: if isAdmin() && isValidTask(request.resource.data);
-      allow delete: if isAdmin();
+      allow read, write: if isAuthenticated();
     }
   }
 }
