@@ -214,8 +214,6 @@ export default function App() {
 
   // Data Listeners
   useEffect(() => {
-    if (!user) return;
-
     const qProjects = query(collection(db, 'projects'), orderBy('createdAt', 'desc'));
     const unsubProjects = onSnapshot(qProjects, (snapshot) => {
       setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project)));
@@ -230,7 +228,7 @@ export default function App() {
       unsubProjects();
       unsubTasks();
     };
-  }, [user]);
+  }, []);
 
   const allAssignees = useMemo(() => {
     const assignees = new Set<string>();
@@ -338,7 +336,6 @@ export default function App() {
   // Handlers
   const handleSaveProject = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!user) return;
     const formData = new FormData(e.currentTarget);
     const planningStart = formData.get('planningStart') as string;
     const planningEnd = formData.get('planningEnd') as string;
@@ -382,7 +379,7 @@ export default function App() {
       deployEnd,
       notionLink: formData.get('notionLink') as string,
       memo: formData.get('memo') as string,
-      ownerId: user.uid,
+      ownerId: user?.uid || 'public',
     };
 
     try {
@@ -400,7 +397,7 @@ export default function App() {
 
   const handleSaveTask = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!user || !selectedProjectId) return;
+    if (!selectedProjectId) return;
     const formData = new FormData(e.currentTarget);
     const data = {
       projectId: selectedProjectId,
@@ -410,7 +407,7 @@ export default function App() {
       endDate: formData.get('endDate') as string,
       status: formData.get('status') as TaskStatus,
       progress: Number(formData.get('progress')),
-      ownerId: user.uid,
+      ownerId: user?.uid || 'public',
     };
 
     try {
@@ -455,31 +452,6 @@ export default function App() {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white p-10 rounded-3xl shadow-2xl max-w-md w-full text-center"
-        >
-          <div className="w-20 h-20 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-lg shadow-indigo-200">
-            <Layout className="w-10 h-10 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-3">Project Hub</h1>
-          <p className="text-slate-500 mb-10">Manage your WBS and product timelines with ease.</p>
-          <button 
-            onClick={signIn}
-            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-semibold hover:bg-indigo-700 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-indigo-100 flex items-center justify-center gap-3"
-          >
-            <User className="w-5 h-5" />
-            Sign in with Google
-          </button>
-        </motion.div>
-      </div>
-    );
-  }
-
   return (
     <ErrorBoundary>
       <div className="min-h-screen flex flex-col">
@@ -494,19 +466,29 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3">
-                <div className="text-right hidden sm:block">
-                  <p className="text-sm font-semibold text-slate-900">{user.displayName}</p>
-                  <p className="text-xs text-slate-500">{user.email}</p>
+              {user ? (
+                <div className="flex items-center gap-3">
+                  <div className="text-right hidden sm:block">
+                    <p className="text-sm font-semibold text-slate-900">{user.displayName}</p>
+                    <p className="text-xs text-slate-500">{user.email}</p>
+                  </div>
+                  <button 
+                    onClick={logOut}
+                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                    title="Sign Out"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
                 </div>
+              ) : (
                 <button 
-                  onClick={logOut}
-                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                  title="Sign Out"
+                  onClick={signIn}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-all flex items-center gap-2"
                 >
-                  <LogOut className="w-5 h-5" />
+                  <User className="w-4 h-4" />
+                  Sign In
                 </button>
-              </div>
+              )}
             </div>
           </div>
         </header>
