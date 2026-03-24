@@ -240,6 +240,8 @@ export default function App() {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAssignee, setSelectedAssignee] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isSummaryView, setIsSummaryView] = useState(false);
   const timelineScrollRef = useRef<HTMLDivElement>(null);
@@ -301,7 +303,10 @@ export default function App() {
           return field.split(',').map(n => n.trim()).includes(selectedAssignee);
         });
 
-        return matchesSearch && matchesAssignee;
+        const matchesStatus = !selectedStatus || p.status === selectedStatus;
+        const matchesCategory = !selectedCategory || p.category === selectedCategory;
+        
+        return matchesSearch && matchesAssignee && matchesStatus && matchesCategory;
       })
       .sort((a, b) => {
         // 1. Category (주요과제 > 서스테이닝)
@@ -597,10 +602,39 @@ export default function App() {
                         onChange={(e) => setSelectedAssignee(e.target.value)}
                         className="pl-10 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-full sm:w-40 appearance-none cursor-pointer"
                       >
-                        <option value="">All Assignees</option>
+                        <option value="">담당자 전체</option>
                         {allAssignees.map(name => (
                           <option key={name} value={name}>{name}</option>
                         ))}
+                      </select>
+                      <ChevronDown className="w-3 h-3 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+
+                    <div className="relative">
+                      <Clock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <select 
+                        value={selectedStatus}
+                        onChange={(e) => setSelectedStatus(e.target.value)}
+                        className="pl-10 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-full sm:w-32 appearance-none cursor-pointer"
+                      >
+                        <option value="">상태 전체</option>
+                        <option value="대기">대기</option>
+                        <option value="진행중">진행중</option>
+                        <option value="완료">완료</option>
+                      </select>
+                      <ChevronDown className="w-3 h-3 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+
+                    <div className="relative">
+                      <Layout className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <select 
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="pl-10 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-full sm:w-40 appearance-none cursor-pointer"
+                      >
+                        <option value="">카테고리 전체</option>
+                        <option value="주요과제">주요과제</option>
+                        <option value="서스테이닝">서스테이닝</option>
                       </select>
                       <ChevronDown className="w-3 h-3 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
