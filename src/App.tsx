@@ -80,6 +80,10 @@ interface Project {
   planningEnd?: string;
   designStart?: string;
   designEnd?: string;
+  backendStart?: string;
+  backendEnd?: string;
+  frontendStart?: string;
+  frontendEnd?: string;
   devStart?: string;
   devEnd?: string;
   qaStart?: string;
@@ -187,7 +191,22 @@ const OrderBadge = ({ order }: { order: number }) => (
 
 // --- Main App ---
 
-const HOLIDAYS_2026 = [
+const HOLIDAYS = [
+  // 2025
+  '2025-01-01', // 신정
+  '2025-01-28', '2025-01-29', '2025-01-30', // 설날
+  '2025-03-01', // 삼일절
+  '2025-03-03', // 삼일절 대체공휴일
+  '2025-05-05', // 어린이날
+  '2025-05-06', // 부처님 오신 날 대체공휴일
+  '2025-06-06', // 현충일
+  '2025-08-15', // 광복절
+  '2025-10-03', // 개천절
+  '2025-10-05', '2025-10-06', '2025-10-07', // 추석
+  '2025-10-08', // 추석 대체공휴일
+  '2025-10-09', // 한글날
+  '2025-12-25', // 크리스마스
+  // 2026
   '2026-01-01', // 신정
   '2026-02-16', '2026-02-17', '2026-02-18', // 설날
   '2026-03-01', // 삼일절
@@ -206,7 +225,7 @@ const HOLIDAYS_2026 = [
 
 const isHoliday = (date: Date) => {
   const dateStr = format(date, 'yyyy-MM-dd');
-  return HOLIDAYS_2026.includes(dateStr);
+  return HOLIDAYS.includes(dateStr);
 };
 
 export default function App() {
@@ -285,10 +304,13 @@ export default function App() {
         return matchesSearch && matchesAssignee;
       })
       .sort((a, b) => {
-        // 1. Priority (order)
-        if ((a.order || 0) !== (b.order || 0)) {
-          return (a.order || 0) - (b.order || 0);
-        }
+        // 1. Category (주요과제 > 서스테이닝)
+        const categoryPriority: Record<string, number> = {
+          '주요과제': 1,
+          '서스테이닝': 2
+        };
+        const categoryDiff = (categoryPriority[a.category] || 99) - (categoryPriority[b.category] || 99);
+        if (categoryDiff !== 0) return categoryDiff;
 
         // 2. Status (진행중 > 대기 > 완료)
         const statusPriority: Record<string, number> = {
@@ -299,14 +321,12 @@ export default function App() {
         const statusDiff = (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99);
         if (statusDiff !== 0) return statusDiff;
 
-        // 3. Start Date (Earliest first)
-        const getStart = (p: Project) => {
-          const dates = [
-            p.startDate, p.planningStart, p.designStart, p.devStart, p.qaStart, p.deployStart
-          ].filter(Boolean) as string[];
-          return dates.length > 0 ? dates.sort()[0] : '9999-12-31';
-        };
-        return getStart(a).localeCompare(getStart(b));
+        // 3. Priority (order)
+        if ((a.order || 0) !== (b.order || 0)) {
+          return (a.order || 0) - (b.order || 0);
+        }
+
+        return 0;
       });
   }, [projects, searchTerm, selectedAssignee]);
 
@@ -492,12 +512,43 @@ export default function App() {
               <h1 className="text-xl font-bold text-slate-900 hidden sm:block">Project Hub</h1>
             </div>
 
-            <div className="flex items-center gap-4">
-              {user ? (
-                <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setIsSummaryView(!isSummaryView)}
+                className={cn(
+                  "px-4 py-2 border rounded-xl text-sm font-bold transition-all shadow-sm",
+                  isSummaryView 
+                    ? "bg-indigo-600 border-indigo-600 text-white" 
+                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                )}
+              >
+                {isSummaryView ? 'Detailed' : 'Summary'}
+              </button>
+
+              <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
+                <button 
+                  onClick={() => setCurrentMonth(subMonths(currentMonth, 12))}
+                  className="p-2 hover:bg-slate-50 rounded-lg transition-all text-slate-500"
+                  title="Previous Year"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <span className="px-4 font-bold text-slate-700 min-w-[80px] text-center">
+                  {format(currentMonth, 'yyyy')}
+                </span>
+                <button 
+                  onClick={() => setCurrentMonth(addMonths(currentMonth, 12))}
+                  className="p-2 hover:bg-slate-50 rounded-lg transition-all text-slate-500"
+                  title="Next Year"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {user && (
+                <div className="flex items-center gap-3 ml-2 pl-4 border-l border-slate-100">
                   <div className="text-right hidden sm:block">
                     <p className="text-sm font-semibold text-slate-900">{user.displayName}</p>
-                    <p className="text-xs text-slate-500">{user.email}</p>
                   </div>
                   <button 
                     onClick={logOut}
@@ -507,14 +558,6 @@ export default function App() {
                     <LogOut className="w-5 h-5" />
                   </button>
                 </div>
-              ) : (
-                <button 
-                  onClick={signIn}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-all flex items-center gap-2"
-                >
-                  <User className="w-4 h-4" />
-                  Sign In
-                </button>
               )}
             </div>
           </div>
@@ -572,37 +615,6 @@ export default function App() {
                       <Plus className="w-4 h-4" />
                       New Project
                     </button>
-                    <div className="h-8 w-px bg-slate-200 mx-1 hidden sm:block" />
-                    <button 
-                      onClick={() => setIsSummaryView(!isSummaryView)}
-                      className={cn(
-                        "px-4 py-2 border rounded-xl text-sm font-medium transition-all shadow-sm",
-                        isSummaryView 
-                          ? "bg-indigo-600 border-indigo-600 text-white" 
-                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                      )}
-                    >
-                      {isSummaryView ? 'Detailed' : 'Summary'}
-                    </button>
-                    <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
-                      <button 
-                        onClick={() => setCurrentMonth(subMonths(currentMonth, 12))}
-                        className="p-2 hover:bg-slate-50 rounded-lg transition-all text-slate-500"
-                        title="Previous Year"
-                      >
-                        <ArrowLeft className="w-4 h-4" />
-                      </button>
-                      <span className="px-6 font-bold text-slate-700 min-w-[100px] text-center">
-                        {format(currentMonth, 'yyyy')}
-                      </span>
-                      <button 
-                        onClick={() => setCurrentMonth(addMonths(currentMonth, 12))}
-                        className="p-2 hover:bg-slate-50 rounded-lg transition-all text-slate-500"
-                        title="Next Year"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
                   </div>
                 </div>
 
@@ -666,8 +678,11 @@ export default function App() {
                       <div className="divide-y divide-slate-100">
                         {filteredProjects.map(project => {
                           const allDates = [
+                            project.startDate, project.endDate,
                             project.planningStart, project.planningEnd,
                             project.designStart, project.designEnd,
+                            project.backendStart, project.backendEnd,
+                            project.frontendStart, project.frontendEnd,
                             project.devStart, project.devEnd,
                             project.qaStart, project.qaEnd,
                             project.deployStart, project.deployEnd
