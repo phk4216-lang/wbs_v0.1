@@ -333,7 +333,7 @@ export default function App() {
 
         return 0;
       });
-  }, [projects, searchTerm, selectedAssignee]);
+  }, [projects, searchTerm, selectedAssignee, selectedStatus, selectedCategory]);
 
   const selectedProject = useMemo(() => 
     projects.find(p => p.id === selectedProjectId), 
