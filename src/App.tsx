@@ -362,6 +362,23 @@ export default function App() {
     [tasks, selectedProjectId]
   );
 
+  const blockedProjects = useMemo(() => {
+    return projects
+      .filter(p => p.isBlocked)
+      .sort((a, b) => {
+        // 1. Category (주요과제 > 서스테이닝)
+        const categoryPriority: Record<string, number> = {
+          '주요과제': 1,
+          '서스테이닝': 2
+        };
+        const categoryDiff = (categoryPriority[a.category] || 99) - (categoryPriority[b.category] || 99);
+        if (categoryDiff !== 0) return categoryDiff;
+
+        // 2. Priority (order)
+        return (a.order || 0) - (b.order || 0);
+      });
+  }, [projects]);
+
   // Scroll to today on load or view change
   useEffect(() => {
     const scrollToToday = () => {
@@ -990,14 +1007,14 @@ export default function App() {
                 </div>
 
                 {/* Blocked Projects List Section */}
-                {projects.some(p => p.isBlocked) && (
+                {blockedProjects.length > 0 && (
                   <div className="mt-12 space-y-4">
                     <div className="flex items-center gap-2">
                       <AlertCircle className="w-5 h-5 text-red-500" />
                       <h3 className="text-lg font-bold text-slate-900">Blocked Projects</h3>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {projects.filter(p => p.isBlocked).map(project => (
+                      {blockedProjects.map(project => (
                         <div 
                           key={project.id}
                           onClick={() => setSelectedProjectId(project.id)}
