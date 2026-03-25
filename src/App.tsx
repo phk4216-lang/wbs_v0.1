@@ -62,9 +62,9 @@ import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 // --- Types ---
 
-type ProjectStatus = '대기' | '진행중' | '완료';
+type ProjectStatus = 'Todo' | 'In Progress' | 'Completed';
 type Category = '주요과제' | '서스테이닝';
-type TaskStatus = 'Todo' | 'In Progress' | 'Done';
+type TaskStatus = 'Todo' | 'In Progress' | 'Completed';
 
 interface Project {
   id: string;
@@ -74,6 +74,8 @@ interface Project {
   beDev: string;
   feDev: string;
   status: ProjectStatus;
+  isBlocked: boolean;
+  blockedByProjectId?: string;
   startDate?: string;
   endDate?: string;
   planningStart?: string;
@@ -158,22 +160,30 @@ const ErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 };
 
 const Badge = ({ children, className }: { children: React.ReactNode, className?: string }) => (
-  <span className={cn("px-1.5 py-0 rounded-md text-[10px] font-bold uppercase tracking-tight", className)}>
+  <span className={cn("px-2 py-0.5 rounded-md text-[10px] font-bold tracking-tight inline-flex items-center justify-center min-w-[36px]", className)}>
     {children}
   </span>
 );
 
 const StatusBadge = ({ status }: { status: ProjectStatus | TaskStatus }) => {
   const styles: Record<string, string> = {
-    '대기': 'bg-blue-100 text-blue-700',
-    '진행중': 'bg-amber-100 text-amber-700',
-    '완료': 'bg-emerald-100 text-emerald-700',
-    'Todo': 'bg-slate-100 text-slate-700',
-    'In Progress': 'bg-amber-100 text-amber-700',
-    'Done': 'bg-emerald-100 text-emerald-700',
+    'Todo': 'bg-blue-50 text-blue-600 border border-blue-100',
+    'In Progress': 'bg-amber-50 text-amber-600 border border-amber-100',
+    'Completed': 'bg-emerald-50 text-emerald-600 border border-emerald-100',
   };
-  return <Badge className={styles[status] || styles['Todo']}>{status}</Badge>;
+
+  const labels: Record<string, string> = {
+    'Todo': '대기',
+    'In Progress': '진행중',
+    'Completed': '완료',
+  };
+  
+  return <Badge className={styles[status] || styles['Todo']}>{labels[status] || status}</Badge>;
 };
+
+const BlockedBadge = () => (
+  <Badge className="bg-red-50 text-red-600 border border-red-100 uppercase">Blocked</Badge>
+);
 
 const CategoryBadge = ({ category }: { category: Category }) => {
   const styles = {
@@ -238,10 +248,12 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'project' | 'task'>('project');
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [formStatus, setFormStatus] = useState<ProjectStatus>('Todo');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAssignee, setSelectedAssignee] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedDeployMonth, setSelectedDeployMonth] = useState<string>('');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isSummaryView, setIsSummaryView] = useState(false);
   const timelineScrollRef = useRef<HTMLDivElement>(null);
@@ -303,10 +315,13 @@ export default function App() {
           return field.split(',').map(n => n.trim()).includes(selectedAssignee);
         });
 
-        const matchesStatus = !selectedStatus || p.status === selectedStatus;
+        const matchesStatus = !selectedStatus || 
+          (selectedStatus === 'Blocked' ? p.isBlocked : p.status === selectedStatus);
         const matchesCategory = !selectedCategory || p.category === selectedCategory;
         
-        return matchesSearch && matchesAssignee && matchesStatus && matchesCategory;
+        const matchesDeployMonth = !selectedDeployMonth || (p.deployEnd && parseISO(p.deployEnd).getMonth() + 1 === parseInt(selectedDeployMonth));
+        
+        return matchesSearch && matchesAssignee && matchesStatus && matchesCategory && matchesDeployMonth;
       })
       .sort((a, b) => {
         // 1. Category (주요과제 > 서스테이닝)
@@ -317,13 +332,15 @@ export default function App() {
         const categoryDiff = (categoryPriority[a.category] || 99) - (categoryPriority[b.category] || 99);
         if (categoryDiff !== 0) return categoryDiff;
 
-        // 2. Status (진행중 > 대기 > 완료)
-        const statusPriority: Record<string, number> = {
-          '진행중': 1,
-          '대기': 2,
-          '완료': 3
+        // 2. Status (In Progress > Blocked > Todo > Completed)
+        const getPriority = (p: Project) => {
+          if (p.isBlocked) return 2;
+          if (p.status === 'In Progress') return 1;
+          if (p.status === 'Todo') return 3;
+          if (p.status === 'Completed') return 4;
+          return 99;
         };
-        const statusDiff = (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99);
+        const statusDiff = getPriority(a) - getPriority(b);
         if (statusDiff !== 0) return statusDiff;
 
         // 3. Priority (order)
@@ -333,7 +350,7 @@ export default function App() {
 
         return 0;
       });
-  }, [projects, searchTerm, selectedAssignee, selectedStatus, selectedCategory]);
+  }, [projects, searchTerm, selectedAssignee, selectedStatus, selectedCategory, selectedDeployMonth]);
 
   const selectedProject = useMemo(() => 
     projects.find(p => p.id === selectedProjectId), 
@@ -413,6 +430,8 @@ export default function App() {
       beDev: formData.get('beDev') as string,
       feDev: formData.get('feDev') as string,
       status: formData.get('status') as ProjectStatus,
+      isBlocked: formData.get('isBlocked') === 'on',
+      blockedByProjectId: formData.get('blockedByProjectId') as string || null,
       category: formData.get('category') as Category,
       order: Number(formData.get('order')),
       startDate: dates.length > 0 ? dates[0] : null,
@@ -527,7 +546,7 @@ export default function App() {
                     : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                 )}
               >
-                {isSummaryView ? 'Detailed' : 'Summary'}
+                {isSummaryView ? '상세 보기' : '요약 보기'}
               </button>
 
               <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
@@ -581,8 +600,8 @@ export default function App() {
               >
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
                   <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Annual Timeline</h2>
-                    <p className="text-slate-500">Yearly overview of all project schedules</p>
+                    <h2 className="text-2xl font-bold text-slate-900">연간 타임라인</h2>
+                    <p className="text-slate-500">모든 프로젝트 일정의 연간 개요</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="relative">
@@ -618,9 +637,10 @@ export default function App() {
                         className="pl-10 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-full sm:w-32 appearance-none cursor-pointer"
                       >
                         <option value="">상태 전체</option>
-                        <option value="대기">대기</option>
-                        <option value="진행중">진행중</option>
-                        <option value="완료">완료</option>
+                        <option value="Todo">대기</option>
+                        <option value="In Progress">진행중</option>
+                        <option value="Blocked">Blocked</option>
+                        <option value="Completed">완료</option>
                       </select>
                       <ChevronDown className="w-3 h-3 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
@@ -638,16 +658,32 @@ export default function App() {
                       </select>
                       <ChevronDown className="w-3 h-3 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
+
+                    <div className="relative">
+                      <Calendar className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <select 
+                        value={selectedDeployMonth}
+                        onChange={(e) => setSelectedDeployMonth(e.target.value)}
+                        className="pl-10 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-full sm:w-32 appearance-none cursor-pointer"
+                      >
+                        <option value="">배포월 전체</option>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                          <option key={m} value={m.toString()}>{m}월</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-3 h-3 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
                     <button 
                       onClick={() => {
                         setModalType('project');
                         setEditingItem(null);
+                        setFormStatus('Todo');
                         setIsModalOpen(true);
                       }}
                       className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-medium hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-100"
                     >
                       <Plus className="w-4 h-4" />
-                      New Project
+                      새 프로젝트
                     </button>
                   </div>
                 </div>
@@ -662,7 +698,7 @@ export default function App() {
                       <div className="sticky top-0 z-20 bg-white">
                         {/* Month Row */}
                         <div className="flex border-b border-slate-200">
-                          <div className="w-64 shrink-0 p-4 font-bold text-slate-400 text-xs uppercase tracking-wider border-r border-slate-200 bg-slate-50/50 sticky left-0 z-30">Project</div>
+                          <div className="w-80 shrink-0 p-4 font-bold text-slate-400 text-xs uppercase tracking-wider border-r border-slate-200 bg-slate-50/50 sticky left-0 z-30">Project</div>
                           <div className="flex">
                             {eachMonthOfInterval({
                               start: startOfYear(currentMonth),
@@ -735,12 +771,13 @@ export default function App() {
                                 setSelectedProjectId(project.id);
                               }}
                             >
-                              <div className="w-64 shrink-0 p-4 border-r border-slate-200 flex flex-col justify-center sticky left-0 z-10 bg-white group-hover:bg-slate-50 transition-colors">
+                              <div className="w-80 shrink-0 p-4 border-r border-slate-200 flex flex-col justify-center sticky left-0 z-10 bg-white group-hover:bg-slate-50 transition-colors">
                                 <div className="flex items-center justify-between mb-1.5">
                                   <div className="flex items-center gap-2">
                                     <StatusBadge status={project.status} />
                                     <CategoryBadge category={project.category} />
                                     <OrderBadge order={project.order} />
+                                    {project.isBlocked && <BlockedBadge />}
                                   </div>
                                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
                                     <button 
@@ -748,6 +785,7 @@ export default function App() {
                                         e.stopPropagation();
                                         setModalType('project');
                                         setEditingItem(project);
+                                        setFormStatus(project.isBlocked ? 'Blocked' as any : project.status);
                                         setIsModalOpen(true);
                                       }}
                                       className="p-1 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-all"
@@ -905,7 +943,7 @@ export default function App() {
                                       className={cn(
                                         "rounded-xl opacity-20 pointer-events-auto",
                                         isSummaryView ? "h-3" : "h-4",
-                                        project.status === '완료' ? "bg-emerald-400" : "bg-indigo-500"
+                                        project.status === 'Completed' ? "bg-emerald-400" : "bg-indigo-500"
                                       )}
                                       style={(() => {
                                         if (isSummaryView) {
@@ -950,6 +988,50 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                {/* Blocked Projects List Section */}
+                {projects.some(p => p.isBlocked) && (
+                  <div className="mt-12 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-red-500" />
+                      <h3 className="text-lg font-bold text-slate-900">Blocked Projects</h3>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {projects.filter(p => p.isBlocked).map(project => (
+                        <div 
+                          key={project.id}
+                          onClick={() => setSelectedProjectId(project.id)}
+                          className="bg-white p-5 rounded-2xl border border-red-100 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-2 mb-3">
+                            <StatusBadge status={project.status} />
+                            <CategoryBadge category={project.category} />
+                            <OrderBadge order={project.order} />
+                            <BlockedBadge />
+                          </div>
+                          <h4 className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors mb-2">{project.name}</h4>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                              <User className="w-3 h-3" />
+                              <span>{project.po}</span>
+                            </div>
+                            {project.blockedByProjectId && (
+                              <div className="p-2 bg-red-50 rounded-lg border border-red-100/50">
+                                <p className="text-[10px] font-bold text-red-600 flex items-center gap-1.5">
+                                  <AlertCircle className="w-3 h-3" />
+                                  Blocked by:
+                                </p>
+                                <p className="text-[10px] text-red-700 font-medium mt-0.5">
+                                  {projects.find(p => p.id === project.blockedByProjectId)?.name || 'Unknown Project'}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -980,11 +1062,23 @@ export default function App() {
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold text-slate-900 leading-tight">{selectedProject.name}</h2>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">우선순위: {selectedProject.order}</span>
+                      <div className="flex items-center gap-2 mt-2">
                         <StatusBadge status={selectedProject.status} />
                         <CategoryBadge category={selectedProject.category} />
+                        <OrderBadge order={selectedProject.order} />
+                        {selectedProject.isBlocked && <BlockedBadge />}
                       </div>
+                      {selectedProject.isBlocked && selectedProject.blockedByProjectId && (
+                        <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3">
+                          <AlertCircle className="w-5 h-5 text-red-500" />
+                          <div>
+                            <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">Blocked by</p>
+                            <p className="text-sm font-bold text-red-800">
+                              {projects.find(p => p.id === selectedProject.blockedByProjectId)?.name || 'Unknown Project'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <button 
@@ -1128,7 +1222,7 @@ export default function App() {
               >
                 <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                   <h3 className="text-xl font-bold text-slate-900">
-                    {editingItem ? 'Edit' : 'New'} {modalType === 'project' ? 'Project' : 'Task'}
+                    {editingItem ? '수정' : '신규'} {modalType === 'project' ? '프로젝트' : '태스크'}
                   </h3>
                   <button 
                     onClick={() => setIsModalOpen(false)}
@@ -1170,12 +1264,42 @@ export default function App() {
                         </div>
                         <div>
                           <label className="block text-sm font-bold text-slate-700 mb-2">Status</label>
-                          <select name="status" defaultValue={editingItem?.status || '대기'} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all">
-                            <option>대기</option>
-                            <option>진행중</option>
-                            <option>완료</option>
+                          <select 
+                            name="status" 
+                            defaultValue={editingItem?.status || 'Todo'}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                          >
+                            <option value="Todo">대기</option>
+                            <option value="In Progress">진행중</option>
+                            <option value="Completed">완료</option>
                           </select>
                         </div>
+                        <div className="flex items-center gap-3 h-full pt-8">
+                          <input 
+                            type="checkbox" 
+                            name="isBlocked" 
+                            id="isBlocked"
+                            defaultChecked={editingItem?.isBlocked}
+                            onChange={(e) => setFormStatus(e.target.checked ? 'Blocked' as any : 'Todo')}
+                            className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <label htmlFor="isBlocked" className="text-sm font-bold text-slate-700">Blocked</label>
+                        </div>
+                        {formStatus === 'Blocked' && (
+                          <div className="sm:col-span-2">
+                            <label className="block text-sm font-bold text-slate-700 mb-2">Blocked By Project</label>
+                            <select 
+                              name="blockedByProjectId" 
+                              defaultValue={editingItem?.blockedByProjectId}
+                              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                            >
+                              <option value="">프로젝트를 선택하세요...</option>
+                              {projects.filter(p => p.id !== editingItem?.id).map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                         <div>
                           <label className="block text-sm font-bold text-slate-700 mb-2">Category</label>
                           <select name="category" defaultValue={editingItem?.category || '주요과제'} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all">
@@ -1246,11 +1370,11 @@ export default function App() {
                           <input name="assignee" required defaultValue={editingItem?.assignee} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" />
                         </div>
                         <div>
-                          <label className="block text-sm font-bold text-slate-700 mb-2">Status</label>
+                          <label className="block text-sm font-bold text-slate-700 mb-2">상태</label>
                           <select name="status" defaultValue={editingItem?.status || 'Todo'} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all">
-                            <option>Todo</option>
-                            <option>In Progress</option>
-                            <option>Done</option>
+                            <option value="Todo">대기</option>
+                            <option value="In Progress">진행중</option>
+                            <option value="Completed">완료</option>
                           </select>
                         </div>
                         <div>
@@ -1275,13 +1399,13 @@ export default function App() {
                       onClick={() => setIsModalOpen(false)}
                       className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all"
                     >
-                      Cancel
+                      취소
                     </button>
                     <button 
                       type="submit"
                       className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100"
                     >
-                      {editingItem ? 'Update' : 'Create'} {modalType === 'project' ? 'Project' : 'Task'}
+                      {editingItem ? '저장' : '생성'} {modalType === 'project' ? '프로젝트' : '태스크'}
                     </button>
                   </div>
                 </form>
